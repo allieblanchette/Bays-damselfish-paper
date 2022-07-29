@@ -1,24 +1,35 @@
+###################################################################
+# Purpose: This code creates the FIGURES in Blanchette et al. 2022 - Effects of onshore development and damselfish (Stegastes nigricans) on coral richness in Opunohu Bay and Cook's Bay in Moorea, French Polynesia 
+# Last updated: June 22, 2022
+# By: Allie Blanchette
+# Raw data available at: https://data.mendeley.com/datasets/whxw97nw86/1
+###################################################################
+
+#R Studio version 1.2.1335
+#R version 3.6.1
+
+# Note - Some of the .csv data is available directly on Mendeley and some requires further set-up. For code for the data set-up and explanation, see 'Bays damselfish code_data set-up.R'
+
+
+
 library(tidyverse) #for data organization
 library(dplyr) #for rename function
+# library(reshape) #for melt function (masks reshape, expand, smiths, stamp functions) 
 library(viridisLite) #for colorblind color palette
 library(viridis) #for colorblind color palette
 library(cowplot) #for draw_plot function
 library(ggplot2)
 library(ggfortify) #for plotting PCA
 library(ggrepel) #for plotting PCA
-
-setwd("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs\\Coral Reefs submission\\Code tables and figures\\R")
-
+library(scales) #for scaling axis labels
 theme_set(theme_bw(15))
 
-
-
+setwd("C:\\Users\\rassweiler\\Documents\\Other stuff\\MBQ\\Jacobs\\For Mendeley and github")
 
 
 #FIGURE 3 - Quadrat point count
-#from Quadrat Scatter plot.R file
 # library(reshape) #for melt function #masks rename function, so use as needed
-Quad_Scatter1<-read.csv("Quadrat df with site.csv")
+Quad_Scatter1<-read.csv("Quadrat_condensed.csv")
 
 QS2<-melt(Quad_Scatter1, id=c("Bay", "Site.old", "Site.updated", "Quad.updated", "DFT.present", "Total.sum")) %>% 
   mutate(variable=recode(variable, Crustose.coralline.algae="CCA"),
@@ -52,9 +63,34 @@ QS3<-QS2 %>%
   mutate(se_c=sd_c/sqrt(n_c),
          se_p=sd_p/sqrt(n_p))
 
-Fig3<-ggplot(data=QS3, aes(x=reorder(Site.updated, Site.duplicated), y=mean_percent, fill=variable))+
+AvgCoral.Bay<-QS2 %>% 
+  group_by(Bay, variable) %>% 
+  summarize(mean_counts=mean(value),
+            mean_percent=mean(percent),
+            sd_c=sd(value),
+            n_c=length(value),
+            sd_p=sd(percent),
+            n_p=length(percent)) %>% 
+  mutate(se_c=sd_c/sqrt(n_c),
+         se_p=sd_p/sqrt(n_p))
+
+Avg.Coral<-QS2 %>% 
+  group_by(variable) %>% 
+  summarize(mean_counts=mean(value),
+            mean_percent=mean(percent),
+            sd_c=sd(value),
+            n_c=length(value),
+            sd_p=sd(percent),
+            n_p=length(percent)) %>% 
+  mutate(se_c=sd_c/sqrt(n_c),
+         se_p=sd_p/sqrt(n_p))
+
+Fig3<-
+  ggplot(data=QS3, aes(x=reorder(Site.updated, Site.duplicated), y=mean_percent, fill=variable))+
   geom_bar(color="black", width = 0.75,stat="identity")+
-  scale_fill_viridis(discrete=TRUE, option="inferno")+
+    scale_fill_manual(values=c("#bdb0a4","#fac228","#fcffa4",
+                               "#1357d1","#81baeb","#65156e",
+                               "#d61c5a","#f57d15"))+
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
         legend.title=element_blank(),
@@ -64,158 +100,98 @@ Fig3<-ggplot(data=QS3, aes(x=reorder(Site.updated, Site.duplicated), y=mean_perc
         axis.text.y = element_text(color="black",size=15))+
   xlab("Site")+
   ylab("Average Percent Cover")+
-  geom_hline(yintercept =4.2, linetype="dashed", size=2)
-
-ggsave("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs\\Data\\Post-grad\\R\\Figure 3.tiff", Fig3, dpi=800, units="mm", width=190, height = 130)
-
+  geom_hline(yintercept = 5.3, linetype="dashed", size = 1.25,color="gray60")+
+  geom_hline(yintercept =4.2, linetype="dashed", size=1.25)
 
 
 
 
 
 
-#FIGURE 4 - DFT and coral specie abundances per site
-#from Coral Analyses.R file
+
+#FIGURE 4 - DFT and coral species abundances per site
 Coral_Data<-read.csv("Coral Data.csv")
 QuadData<-read.csv("Quadrat Data.csv")
 
 Abuns.DFT<-QuadData %>% 
   select(Bay, Site.old, Site.updated, DFT.present) %>% 
+  mutate(across(Bay, factor, levels=c("Opunohu","Cook's"))) %>% 
   group_by(Bay, Site.updated, Site.old) %>% 
   summarize(DFTsums=sum(DFT.present))
 
-Abuns.Cooks<-Coral_Data %>% 
-  group_by(Bay, Site.old, Coral) %>% 
+Abuns.Corals<-Coral_Data %>% 
+  filter(Coral!="n/a") %>% 
+  mutate(across(Bay, factor, levels=c("Opunohu","Cook's")),
+         across(DFT.present, factor, levels=c("1","0"))) %>% 
+  group_by(Bay, Site.updated, Site.old, Coral, DFT.present) %>% 
   summarize(Coral.Abun=length(Coral)) %>% 
-  filter(Coral!="n/a",
-         Bay!="Opunohu") %>% 
-  mutate(Coral=recode(Coral, Cyphastrea.sp.="Cyphastrea sp."),
-         Coral=recode(Coral, Fungia.fungites="Fungia fungites"),
-         Coral=recode(Coral, Gardineroseris.planulata="Gardineroseris planulata"),
-         Coral=recode(Coral, Leptastrea.sp="Leptastrea sp."),
-         Coral=recode(Coral, Leptoseris.sp="Leptoseris sp."),
-         Coral=recode(Coral, Montastrea.curta="Montastrea curta"),
-         Coral=recode(Coral, Montipora.sp="Montipora sp."),
-         Coral=recode(Coral, Pavona.cactus="Pavona cactus"),
-         Coral=recode(Coral, Pocillopora.sp="Pocillopora sp."),
-         Coral=recode(Coral, Porites.lobata="Porites lobata"),
-         Coral=recode(Coral, Porites.rus="Porites rus"),
-         Coral=recode(Coral, Psammocora.obtusangula="Psammocora obtusangula"),
-         Coral=recode(Coral, Psammocora.profundacella="Psammocora profundacella"),
-         Coral=recode(Coral, Stylocoeniella.armata="Stylocoeniella armata")) %>% 
-  left_join(Abuns.DFT) %>% 
-  select(-Site.updated)
+  mutate(Coral=as.factor(recode(Coral, Cyphastrea.sp.="Cyphastrea sp.")),
+         Coral=as.factor(recode(Coral, Fungia.fungites="Fungia fungites")),
+         Coral=as.factor(recode(Coral, Gardineroseris.planulata="Gardineroseris planulata")),
+         Coral=as.factor(recode(Coral, Herpolitha.limax="Herpolitha limax")),
+         Coral=as.factor(recode(Coral, Leptastrea.sp="Leptastrea sp.")),
+         Coral=as.factor(recode(Coral, Leptoseris.sp="Leptoseris sp.")),
+         Coral=as.factor(recode(Coral, Montastrea.curta="Montastrea curta")),
+         Coral=as.factor(recode(Coral, Montipora.sp="Montipora sp.")),
+         Coral=as.factor(recode(Coral, Pavona.cactus="Pavona cactus")),
+         Coral=as.factor(recode(Coral, Pocillopora.sp="Pocillopora sp.")),
+         Coral=as.factor(recode(Coral, Porites.lobata="Porites lobata")),
+         Coral=as.factor(recode(Coral, Porites.rus="Porites rus")),
+         Coral=as.factor(recode(Coral, Psammocora.obtusangula="Psammocora obtusangula")),
+         Coral=as.factor(recode(Coral, Psammocora.profundacella="Psammocora profundacella")),
+         Coral=as.factor(recode(Coral, Stylocoeniella.armata="Stylocoeniella armata")))
 
-Abuns.Cooks$Coral<-factor(Abuns.Cooks$Coral, levels = c("Cyphastrea sp.","Fungia fungites", "Gardineroseris planulata","Herpolitha limax", "Leptastrea sp.", "Leptoseris sp.", "Montastrea curta","Montipora sp.","Pavona cactus","Pocillopora sp.","Porites lobata", "Porites rus","Psammocora obtusangula","Psammocora profundacella","Stylocoeniella armata"))
-
-Abuns.Cooks2<-Abuns.Cooks %>% 
-  mutate(Site=as.integer(Site.old)+5)
-
-Abuns.Opu<-Coral_Data %>% 
-  group_by(Bay, Site.old, Coral) %>% 
-  summarize(Coral.Abun=length(Coral)) %>% 
-  filter(Coral!="n/a",
-         Bay=="Opunohu") %>% 
-  mutate(Coral=recode(Coral, Cyphastrea.sp.="Cyphastrea sp."),
-         Coral=recode(Coral, Fungia.fungites="Fungia fungites"),
-         Coral=recode(Coral, Gardineroseris.planulata="Gardineroseris planulata"),
-         Coral=recode(Coral, Herpolitha.limax="Herpolitha limax"),
-         Coral=recode(Coral, Leptastrea.sp="Leptastrea sp."),
-         Coral=recode(Coral, Leptoseris.sp="Leptoseris sp."),
-         Coral=recode(Coral, Montastrea.curta="Montastrea curta"),
-         Coral=recode(Coral, Montipora.sp="Montipora sp."),
-         Coral=recode(Coral, Pavona.cactus="Pavona cactus"),
-         Coral=recode(Coral, Pocillopora.sp="Pocillopora sp."),
-         Coral=recode(Coral, Porites.lobata="Porites lobata"),
-         Coral=recode(Coral, Porites.rus="Porites rus"),
-         Coral=recode(Coral, Psammocora.obtusangula="Psammocora obtusangula"),
-         Coral=recode(Coral, Psammocora.profundacella="Psammocora profundacella"),
-         Coral=recode(Coral, Stylocoeniella.armata="Stylocoeniella armata")) %>% 
-  left_join(Abuns.DFT) %>% 
-  select(-Site.updated)
-
-Abuns.Opu$Coral<-factor(Abuns.Opu$Coral, levels = c("Cyphastrea sp.","Fungia fungites", "Gardineroseris planulata","Herpolitha limax", "Leptastrea sp.", "Leptoseris sp.", "Montastrea curta","Montipora sp.","Pavona cactus","Pocillopora sp.","Porites lobata", "Porites rus","Psammocora obtusangula","Psammocora profundacella","Stylocoeniella armata"))
+Abuns.Corals$Coral<-factor(Abuns.Corals$Coral, levels = c("Cyphastrea sp.",
+                                                          "Fungia fungites",
+                                                          "Gardineroseris planulata",
+                                                          "Herpolitha limax", 
+                                                          "Leptastrea sp.", 
+                                                          "Leptoseris sp.", 
+                                                          "Montastrea curta",
+                                                          "Montipora sp.",
+                                                          "Pavona cactus",
+                                                          "Pocillopora sp.",
+                                                          "Porites lobata", 
+                                                          "Porites rus",
+                                                          "Psammocora obtusangula",
+                                                          "Psammocora profundacella",
+                                                          "Stylocoeniella armata"))
 
 
-DFTOpun<-ggplot(subset(Abuns.DFT, Bay%in%c("Opunohu")), aes(x=Site.old, y=DFTsums))+
+
+Fig4ab<-
+ggplot(Abuns.DFT, aes(x=Site.old, y=DFTsums))+
   geom_bar(stat="identity", width=0.75, fill="black")+
-  ylab(expression(paste("Sum of ", italic(" S. nigricans"), " territories")))+
+  facet_wrap(~ Bay,
+             scales = 'fixed',
+             labeller = labeller(Bay = 
+                                   c("Opunohu" = "Opunohu Bay",
+                                     "Cook's" = "Cook's Bay")))+
   ylim(0,15)+
+  ylab(expression(paste("Sum of ", italic(" S. nigricans"), " territories")))+
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
         axis.title.x=element_blank(),
         axis.text.x = element_blank(),
         axis.text.y = element_text(color="black",size=12),
-        axis.title.y=element_text(color="black", size=12))
-
-DFTCook<-ggplot(subset(Abuns.DFT, Bay%in%c("Cook's")), aes(x=Site.updated, y=DFTsums))+
-  geom_bar(stat="identity", width=0.75, fill="black")+
-  ylim(0,15)+
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        axis.title.x=element_blank(),
-        axis.title.y=element_blank(),
-        axis.text.y = element_blank(),
-        axis.text.x = element_blank(),
-        axis.ticks.y=element_blank())
-
-CorOpun<-ggplot(Abuns.Opu, aes(x=Site.old, y=Coral.Abun, fill=Coral))+
-  geom_bar(color="black", width = 0.75,stat="identity")+
-  ylim(0,225)+
-  ylab("Total Coral Abundance")+
-  xlab("Opunohu Bay Sites")+
-  theme(axis.ticks=element_blank(),
-        axis.text.x = element_text(color="black",size=12), 
-        axis.title.x = element_text(color="black",size=12), 
-        axis.text.y=element_text(color="black", size=12),
         axis.title.y=element_text(color="black", size=12),
-        legend.title=element_blank(),
-        panel.grid=element_blank(),
-        legend.position="none")+
-  scale_fill_manual(values=c("#000000","#004949","#009292",
-                             "#ff6db6","#ffb6db","#490092",
-                             "#006ddb","#b66dff","#6db6ff",
-                             "#b6dbff","#920000","#924900",
-                             "#db6d00","#24ff24","#ffff6d"))
+        axis.ticks.x = element_blank(),
+        strip.background = element_blank(),
+        panel.spacing=unit(2,"line"))
 
-CorCook<-ggplot(Abuns.Cooks2, aes(x=Site, y=Coral.Abun, fill=Coral))+
-  geom_bar(color="black", width = 0.75,stat="identity")+
-  xlab("Cook's Bay Sites")+
-  ylim(0,225)+
-  theme(axis.ticks=element_blank(),
-        axis.title.x = element_text(color="black",size=12),
-        axis.text.x = element_text(color="black",size=12), 
-        axis.title.y = element_blank(),
-        axis.text=element_blank(),
-        legend.title=element_blank(),
-        panel.grid=element_blank(),
-        legend.position="none")+
-  scale_fill_manual(values=c("#000000", "#004949","#009292",
-                             "#ffb6db", "#490092", "#006ddb",
-                             "#b66dff", "#6db6ff", "#b6dbff",
-                             "#920000", "#924900",  "#db6d00",
-                             "#24ff24","#ffff6d"))
 
-Fig4_legend<-ggplot(Abuns.Opu, aes(x=Site.old, y=Coral.Abun, fill=Coral))+
+Fig4cdef<-
+ggplot(Abuns.Corals, aes(x=Site.old, y=Coral.Abun, fill=Coral))+
   geom_bar(color="black", width = 0.75,stat="identity")+
-  theme(legend.position = "right",
-        legend.text=element_text(color="black", size=10),
-        legend.title=element_blank())+
-  scale_fill_manual(values=c("#000000",
-                             "#004949",
-                             "#009292",
-                             "#ff6db6",
-                             "#ffb6db",
-                             "#490092",
-                             "#006ddb",
-                             "#b66dff",
-                             "#6db6ff",
-                             "#b6dbff",
-                             "#920000",
-                             "#924900",
-                             "#db6d00",
-                             "#24ff24",
-                             "#ffff6d"),
+  facet_wrap(~ DFT.present+Bay,
+             scales = 'fixed')+
+  ylim(0,230)+
+  ylab("Total Coral Abundance")+
+  scale_fill_manual(values=c("#000000","#004799","#009292",
+                             "deeppink2","#fad2e6","#52178f",
+                             "dodgerblue","#b66dff","cyan",
+                             "lightblue","#920000","#924900",
+                             "#db6d00","#24ff24","#ffff6d"),
                     labels = c(
                       expression(paste(italic("Cyphastrea sp."))),
                       expression(paste(italic("Fungia fungites"))),
@@ -232,20 +208,19 @@ Fig4_legend<-ggplot(Abuns.Opu, aes(x=Site.old, y=Coral.Abun, fill=Coral))+
                       expression(paste(italic("Psammocora contigua"))),
                       expression(paste(italic("Psammocora profundacella"))),
                       expression(paste(italic("Stylocoeniella armata")))))+
-  theme(legend.text.align = 0)
-
-Fig4_panels<-ggdraw()+
-  draw_plot(DFTOpun, x=0.03, y=.5, width=.45, height=.48)+
-  draw_plot(DFTCook, x=.52, y=.5, width=.39, height=.48)+
-  draw_plot(CorOpun, x=0.03, y=0, width=.45, height=.51)+
-  draw_plot(CorCook, x=.52, y=0, width=.39, height=.51)+
-  draw_plot_label(label= c("a","b","c","d"), size=13,
-                  x= c(0.01, 0.5, 0.01, 0.5), y = c(1, 1, 0.5,0.5))
-
-ggsave("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs\\Data\\Post-grad\\R\\Fig4_panels.tiff", Fig4_panels, dpi=800, units="mm", width=190, height = 130)
-
-ggsave("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs\\Data\\Post-grad\\R\\Fig4_legend.tiff", Fig4_legend, dpi=800, units="mm", width=190, height = 130)
-
+  theme(
+    axis.text.x = element_text(color="black",size=12), 
+    axis.title.x = element_blank(), 
+    axis.text.y=element_text(color="black", size=12),
+    axis.title.y=element_text(color="black", size=12),
+    legend.position = "bottom",
+    legend.text.align = 0,
+    legend.title=element_blank(),
+    legend.text=element_text(size=10),
+    panel.grid=element_blank(),
+    strip.text.x = element_blank(),
+    panel.spacing=unit(2,"line"))+
+  guides(fill=guide_legend(ncol=3))
 
 
 
@@ -255,7 +230,6 @@ ggsave("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs
 
 
 #FIGURE 5 - PCA
-#from PCA.R file
 
 #prepping PCA data
 PCA_data<-read.csv("PCA.csv") %>% 
@@ -344,21 +318,21 @@ corals<-
            data=PCA_8sites,
            colour="Damselfish.Territory.f",
            shape="Damselfish.Territory.f",
-           size=2.5,
+           size=1.25,
            loadings=TRUE, 
            loadings.label=TRUE, 
            loadings.colour="black", 
            loadings.label.colour="black",
            loadings.label.repel=T,
            loadings.label.size=3)+
+  geom_hline(yintercept=0, linetype="dashed", color = "gray")+
+  geom_vline(xintercept=0, linetype="dashed", color = "gray")+
   scale_shape_manual(expression(paste(italic("S. nigricans "),"Territory")),
                      values= c("circle","triangle"),
                      labels= c(Absent="Absent",Present="Present"))+
   scale_color_manual(expression(paste(italic("S. nigricans "),"Territory")),
                      values=c("lightblue","orange"),
                      labels= c(Absent="Absent",Present="Present"))+
-  geom_hline(yintercept=0, linetype="dashed", color = "gray")+
-  geom_vline(xintercept=0, linetype="dashed", color = "gray")+
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
         axis.title.x = element_text(color="black",size=12), 
@@ -373,21 +347,21 @@ benthic<-
            data=PCA_8sites,
            colour="Damselfish.Territory.f",
            shape="Damselfish.Territory.f",
-           size=2.5,
+           size=1.25,
            loadings=TRUE, 
            loadings.label=TRUE, 
            loadings.colour="black",
            loadings.label.colour="black",
            loadings.label.repel=T,
            loadings.label.size=3)+
+  geom_hline(yintercept=0, linetype="dashed", color = "gray")+
+  geom_vline(xintercept=0, linetype="dashed", color = "gray")+
   scale_shape_manual(expression(paste(italic("S. nigricans ")," Territory")),
                      values= c("circle","triangle"),
                      labels= c(Absent="Absent",Present="Present"))+
   scale_color_manual(expression(paste(italic("S. nigricans ")," Territory")),
                      values=c("lightblue","orange"),
                      labels= c(Absent="Absent",Present="Present"))+
-  geom_hline(yintercept=0, linetype="dashed", color = "gray")+
-  geom_vline(xintercept=0, linetype="dashed", color = "gray")+
   guides(color=guide_legend(title="Damselfish\nTerritory"))+
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
@@ -403,8 +377,6 @@ Fig5<-
   draw_plot(corals, x=.44, y=.5, width=.57, height=.48)+
   draw_plot_label(label= c("a","b"), size=13,
                   x= c(0.01, 0.47), y = c(1, 1))
-
-ggsave("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs\\Data\\Post-grad\\R\\Figure 5.tiff", Fig5, dpi=800, units="mm", width=190, height = 130)
 
 
 # TABLES S3 and S4
@@ -439,7 +411,7 @@ corals.scree<-
   ggplot(aes(x=reorder(PC, PC_num),y=var_explained, group=1))+
   geom_point(size=2.5)+
   geom_line()+
-  ylab("Variance explained for coral species")+
+  ylab("Variance explained for coral taxa")+
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
         axis.title.x = element_blank(), 
@@ -454,9 +426,6 @@ FigS2<-
   draw_plot_label(label= c("a","b"), size=13,
                   x= c(0.01, 0.48), y = c(1, 1))
 
-ggsave("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs\\Data\\Post-grad\\R\\Figure S2.tiff", FigS2, dpi=800, units="mm", width=190, height = 130)
-
-
 
 
 
@@ -466,8 +435,6 @@ ggsave("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs
 
 
 #Figure 6 - CORAL RICHNESS IN/OUT OF DFT
-#from DFT presence figures.R file
-
 Data_table1<-read.csv("Data_table1_quad.csv")
 
 ByCoral_long<-read.csv("ByCoral_long.csv") #pretty sure it's excluding sites 5 and 10, but it's confusing to backtrack bc i made the csv in excel (not R) and renamed it *eye roll*
@@ -516,7 +483,7 @@ avgrich<-
   ggplot(data = ST1_DFT_filt, aes(x=reorder(DFT.present, n.Abun.ALL), y = m.Rich.ALL))+
   geom_point(color="black", size=3)+
   geom_errorbar(aes(ymin=m.Rich.ALL-se.Rich.ALL, ymax=m.Rich.ALL+se.Rich.ALL), width=0)+
-  ylab("Species Richness")+
+  ylab("Coral Richness")+
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
         axis.title.x = element_blank(), 
@@ -529,7 +496,8 @@ bycoral<-
   geom_point(size=2, aes(color=Coral))+
   geom_errorbar(aes(ymin=m.abun-se, ymax=m.abun+se, color=Coral), width=0)+
   geom_smooth(method="lm", se=F, aes(color=Coral), size=0.75)+
-  ylab("Species Abundance")+
+  ylab("Coral Abundance")+
+  scale_y_continuous(labels = label_number(accuracy = 0.1))+
   scale_color_manual(values=c("#000000",
                               "#004949",
                               "#009292",
@@ -576,11 +544,9 @@ bycoral<-
 Fig6<-
   ggdraw()+
   draw_plot(avgrich, x=0.07, y=.65, width=.59, height=.31)+
-  draw_plot(bycoral, x=0.1, y=0, width=.57, height=.66)+
+  draw_plot(bycoral, x=0.07, y=0, width=.57, height=.66)+
   draw_plot_label(label= c("a","b"), size=15,
                   x= c(0.001, 0.001), y = c(1, 0.67))
-
-ggsave("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs\\Data\\Post-grad\\R\\Figure 6.tiff", Fig6, dpi=800, units="mm", width=130, height = 190)
 
 
 
@@ -593,7 +559,6 @@ ggsave("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs
 
 
 #FIGURE S1 - Visibility by sites
-#from GLMs_Bay Site.R file
 PCA<-read.csv("PCA.csv")
 
 PCA_BS<-PCA %>% 
@@ -629,5 +594,3 @@ FigS1<-
         axis.text.y = element_text(color="black",size=15),
         legend.text=element_text(color="black", size=12))+
   xlab("Site")
-
-ggsave("C:\\Users\\rassweiler\\Documents\\MBQ - clean out folder one day\\Jacobs\\Data\\Post-grad\\R\\Figure S1.tiff", FigS1, dpi=800, units="mm", width=190, height = 130)
